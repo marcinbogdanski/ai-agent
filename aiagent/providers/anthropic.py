@@ -1,6 +1,6 @@
 """Simple Anthropic LLM interface implementation."""
 
-from typing import Optional, List, Dict, Any
+from typing import Any
 import anthropic
 
 
@@ -20,25 +20,42 @@ class AnthropicProvider:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
     
-    def send_message(self, message: str, max_tokens: int = 1024) -> str:
-        """Send a message to the LLM and get a response.
+    def send_message(self, messages: list[dict[str, str]], max_tokens: int = 1024) -> Any:
+        """Send messages to the LLM and get a response.
         
         Args:
-            message: The message to send
+            messages: List of message dicts with 'role' and 'content' keys
+            max_tokens: Maximum tokens in response (default: 1024)
+            
+        Returns:
+            The full Anthropic Message response object
+        """
+        assert isinstance(messages, list), "Messages must be a list of dicts"
+        assert isinstance(max_tokens, int), "max_tokens must be an integer"
+        
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            messages=messages
+        )
+        
+        return response
+    
+    def send_text_message(self, message: str, max_tokens: int = 1024) -> str:
+        """Send a single text message to the LLM and get a text response.
+        
+        This is a convenience wrapper around send_message for simple string interactions.
+        
+        Args:
+            message: The message to send as a string
             max_tokens: Maximum tokens in response (default: 1024)
             
         Returns:
             The LLM's response as a string
         """
         assert isinstance(message, str), "Message must be a string"
-        assert isinstance(max_tokens, int), "max_tokens must be an integer"
         
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "user", "content": message}
-            ]
-        )
+        messages = [{"role": "user", "content": message}]
+        response = self.send_message(messages, max_tokens)
         
         return response.content[0].text
