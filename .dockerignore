@@ -1,0 +1,12 @@
+# Python
+*.py[cod]
+__pycache__/
+
+# Environment
+*.env
+
+# Git
+.git/
+.gitignore
+
+# Other
