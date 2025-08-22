@@ -1,0 +1,35 @@
+{
+    // General Properties
+    "name": "AI Agent",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": ".."
+    },
+
+    // Configure tool-specific properties.
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "remote.autoForwardPorts": false
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.debugpy",
+                "ms-azuretools.vscode-docker",
+                "saoudrizwan.claude-dev"  // Cline
+            ]
+        }
+    },
+
+    // Mounts Points
+    "mounts": [
+    ],
+
+    // Workspace Settings
+    "runArgs": [
+        "--network=host",
+        "--env-file=secrets.env"
+    ],
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/appuser/app,type=bind,consistency=cached",
+    "workspaceFolder": "/home/appuser/app"
+}
