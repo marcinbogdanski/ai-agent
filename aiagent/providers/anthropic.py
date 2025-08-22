@@ -20,7 +20,7 @@ class AnthropicProvider:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
     
-    def send_message(self, messages: list[dict[str, str]], max_tokens: int = 1024) -> Any:
+    def send_message(self, messages: list[dict[str, str]], max_tokens: int = 1024) -> dict[str, str]:
         """Send messages to the LLM and get a response.
         
         Args:
@@ -38,8 +38,12 @@ class AnthropicProvider:
             max_tokens=max_tokens,
             messages=messages
         )
-        
-        return response
+       
+        return {
+            "role": "assistant",
+            "content": response.content[0].text
+        }
+
     
     def send_text_message(self, message: str, max_tokens: int = 1024) -> str:
         """Send a single text message to the LLM and get a text response.
@@ -57,5 +61,5 @@ class AnthropicProvider:
         
         messages = [{"role": "user", "content": message}]
         response = self.send_message(messages, max_tokens)
-        
-        return response.content[0].text
+
+        return response["content"]

@@ -39,12 +39,12 @@ def test_send_message_integration():
     
     # Verify we got a response object
     assert response is not None
-    assert hasattr(response, 'content')
-    assert len(response.content) > 0
-    assert hasattr(response.content[0], 'text')
-    
+    assert 'content' in response
+    assert isinstance(response['content'], str)
+    assert len(response['content']) > 0
+
     # Extract and verify text
-    response_text = response.content[0].text
+    response_text = response['content']
     assert isinstance(response_text, str)
     assert len(response_text) > 0
     
