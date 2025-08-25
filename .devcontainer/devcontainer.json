@@ -27,7 +27,6 @@
 
     // Workspace Settings
     "runArgs": [
-        "--env-file=secrets.env"
     ],
     "workspaceMount": "source=${localWorkspaceFolder},target=/home/appuser/app,type=bind,consistency=cached",
     "workspaceFolder": "/home/appuser/app"
