@@ -20,12 +20,12 @@ class AnthropicProvider:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
     
-    def send_message(self, messages: list[dict[str, str]], max_tokens: int = 1024) -> dict[str, str]:
+    def send_message(self, messages: list[dict[str, str]], max_tokens: int) -> dict[str, str]:
         """Send messages to the LLM and get a response.
         
         Args:
             messages: List of message dicts with 'role' and 'content' keys
-            max_tokens: Maximum tokens in response (default: 1024)
+            max_tokens: Maximum tokens in response (recommended: 32000)
             
         Returns:
             The full Anthropic Message response object
@@ -45,15 +45,15 @@ class AnthropicProvider:
         }
 
     
-    def send_text_message(self, message: str, max_tokens: int = 1024) -> str:
+    def send_text_message(self, message: str, max_tokens: int) -> str:
         """Send a single text message to the LLM and get a text response.
         
         This is a convenience wrapper around send_message for simple string interactions.
         
         Args:
             message: The message to send as a string
-            max_tokens: Maximum tokens in response (default: 1024)
-            
+            max_tokens: Maximum tokens in response (recommended: 32000)
+
         Returns:
             The LLM's response as a string
         """
