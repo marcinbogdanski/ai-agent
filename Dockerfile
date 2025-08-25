@@ -2,7 +2,7 @@ FROM python:3.13.5-slim-bookworm
 
 # DEVELOPMENT: Git
 # - required for VSCode to highlight changes
-RUN apt-get update && apt-get install -y -qq --no-install-recommends git \
+RUN apt-get update && apt-get install -y -qq --no-install-recommends git bash-completion \
     && rm -rf /var/lib/apt/lists/*
 # DEVELOPMENT: Claude Code
 # - npm for Claude Code, procps for IDE integration to work
