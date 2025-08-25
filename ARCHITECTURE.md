@@ -2,10 +2,10 @@
 **aiagent** is a small, explicit agent loop that delegates capability via tools and MCP. It favors clarity over cleverness and is built to be modified.
 
 Key decisions:
-- **Provider**: Anthropic (v0.1). Usage is read from provider metadata and printed/logged.
-- **Context**: `AGENT.md` (≤ 64 KB) prepended to the system prompt each session.
-- **Loop**: REPL chat with tool-call support and a cap of **6** tool calls per user turn.
-- **Memory**: Session-only (process memory); `/memory` appends to `AGENT.md` persistently.
+- **Provider**: Anthropic. Usage is read from provider metadata and printed/logged.
+- **Context**: `AGENT.md` prepended to the system prompt each session.
+- **Loop**: REPL chat with tool-call support.
+- **Memory**: Session-only (process memory). User can edit `AGENT.md` for persistent memory.
 - **Logging**: Human logs to terminal; structured JSONL per session.
 - **MCP**: Static servers (e.g., Playwright at `127.0.0.1:8710`), tools exposed as `mcp.<server>.<tool>`.
 
@@ -17,6 +17,7 @@ Key decisions:
 ```python
 @dataclass
 class Message:
+    # Exact schema TBD, this is rough example only, consult code
     role: Literal["system", "user", "assistant", "tool"]
     content: str | list[dict]  # provider-specific segments allowed
     name: str | None = None    # tool name for tool results
@@ -27,6 +28,7 @@ class Message:
 ```python
 @dataclass
 class ToolSpec:
+    # Exact schema TBD, this is rough example only, consult code
     name: str
     description: str
     schema: dict  # JSON-schema for args
@@ -34,6 +36,7 @@ class ToolSpec:
 
 @dataclass
 class ToolResult:
+    # Exact schema TBD, this is rough example only, consult code
     content: str  # text payload (UTF-8)
     ok: bool
     meta: dict    # e.g., exit_code, truncated, bytes
@@ -46,7 +49,7 @@ tools = {
   "fs.read": ToolSpec(...),
   "fs.write": ToolSpec(...),
   "shell.exec": ToolSpec(...),
-  # MCP tools discovered from static config → namespaced as mcp.<server>.<tool>
+  # MCP tools discovered from static config -> namespaced as mcp.<server>.<tool>
 }
 ```
 
@@ -62,18 +65,9 @@ latency_ms, error
 Example (pretty-printed for docs):
 ```json
 {
-  "ts": "2025-08-25T12:34:56.789Z",
-  "level": "INFO",
-  "event": "assistant_message",
-  "session_id": "9f8e...",
-  "turn": 3,
-  "actor": "assistant",
-  "model": "claude-3.5-sonnet",
-  "output": "Here's the plan...",
-  "prompt_tokens": 1420,
-  "completion_tokens": 361,
-  "thinking_tokens": 128,
-  "latency_ms": 2890
+    "role": "assistant",
+    "content": "Here's teh plan...",
+    "..": ".."
 }
 ```
 
@@ -81,16 +75,14 @@ Example (pretty-printed for docs):
 
 # Provider Integration (Anthropic v0.1)
 - **Model**: `claude-3.5-sonnet` by default.
-- **Temperature**: not sent unless `--temp` is specified.
 - **Usage**: read `input_tokens`, `output_tokens`, and if available `thinking_tokens`; compute total.
-- **Retries**: Up to 2 on 429/5xx with exponential backoff.
 - **No streaming**: requests are single-shot per turn.
 - **Function/Tool use**: Anthropic’s tool use format is supported; OpenAI-style is planned later.
 
 ## Prompt/Context Layout
 On session start:
-1. Read `aiagent/agent/memory/AGENT.md` (truncate to **64 KB** if larger).
-2. Load `aiagent/agent/prompts/system.md`.
+1. Read `AGENT.md` and inject into conversation.
+2. Load `aiagent/agent/prompts/system.md` and use as system prompt
 3. Compose system content: `system.md` + separator + `AGENT.md excerpt`.
 
 Per turn, messages look like:
@@ -129,63 +121,38 @@ Per turn, messages look like:
 ## Entrypoint
 `aiagent` is the entrypoint.
 
-- `aiagent` → interactive REPL
-- `aiagent --exec "..."` → one-shot input (no multiline)
-- `--debug` → DEBUG logs in terminal
-- `--model` → override model name
-- `--temp` → set temperature (omit to leave unset)
+- `aiagent` -> interactive REPL
+- `aiagent --exec "..."` -> one-shot input (no multiline)
 
 ## Slash Commands (handled client-side)
-- `/memory <text>` → append `* <text>` to the **end of AGENT.md** (exact text, no timestamp/section); also prints a confirmation line.
-- `/commit <msg>` → dispatches to shell tool as `git add -A && git commit -m "<msg>"`.
-- `/clear` → rotates to a new JSONL file and resets conversation state.
-- `/quit` → exits process.
+- `/clear` -> rotates to a new JSONL file and resets conversation state.
+- `/quit` -> exits process.
 
 ---
 
 # Agent Loop (pseudo-code)
 ```python
-def run_turn(user_input: str):
-    if is_slash_cmd(user_input):
-        result = handle_slash_cmd(user_input)
-        log(event="tool_result", actor="tool", output=result)
-        print(result.human_message)
-        return
 
-    messages = build_messages(system_ctx, transcript, user_input)
+class Agent:
+    def __init__(api_key):
+        self.api_key = api_key
+        self.provider = ...
+        self.conversation = ...  # history of messages
+        self.system_prompt = ...
+        self.agent_file = ... # read AGENT.md
 
-    for attempt in range(3):  # 1 try + 2 retries on 429/5xx
-        t0 = now()
-        resp = anthropic_client.complete(messages, tools=registry.schemas())
-        latency = now() - t0
-        usage = extract_usage(resp)
-        log_assistant(resp, usage, latency)
 
-        tool_calls = extract_tool_calls(resp)
-        if not tool_calls:
-            print(render_human(resp))
-            print_usage(usage)
-            transcript.append(resp)
-            return
+    def multi_step(user_message: str)
+        # LLM API call
+        llm_response = self.conversation.send_message(user_message)
+        print(llm_response)
 
-        for i, call in enumerate(tool_calls[:6]):  # cap at 6 tool calls
-            spec = registry.get(call.name)
-            args = validate(spec.schema, call.args)
-            result = spec.handler(args)
-            log_tool(spec.name, args, result)
-            messages.append(tool_result_message(call.id, result))
-
-        # re-ask the model with tool results
-        continue
+        while True:
+            if is_tool_call(llm_response):
+                tool_call_result = self.perform_tool_call(llm_response)
+                llm_response = self.conversation.send_message(tool_call_result)
+                print(llm_response)
 ```
-
----
-
-# Error Handling
-- **API key missing**: exit non-zero with a clear message.
-- **Provider errors (429/5xx)**: retry up to 2 times with backoff; then log `error` and print a concise failure line.
-- **Tool exceptions**: converted into `{ok=False, error: <msg>}` tool results; included in messages.
-- **Shell timeouts**: `exit_code=124` equivalent + `truncated=False`, `stderr` includes timeout note.
 
 ---
 
@@ -198,11 +165,4 @@ def run_turn(user_input: str):
 
 # Testing & Quality
 - **pytest** for unit tests (tools, loop happy-path, MCP adapter handshake mocked)
-- **ruff + black** for lint/format
-- **mypy** type checks
 
----
-
-# Performance Targets (soft)
-- Cold start (first CLI prompt to first token): under 5s with warm network
-- Typical single-shot turn (no tools): under 3s

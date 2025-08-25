@@ -3,12 +3,12 @@
 **aiagent** is a minimal but realistic Python agent intended for learning. It focuses on a clean, correct core loop with just enough features to be useful:
 
 - Chat REPL and one-shot execution
-- Anthropic provider (v0.1), token usage display
+- Anthropic provider, token usage display
 - Tool calling: filesystem (list/read/write) and shell (bash)
-- Memory file **AGENT.md** auto-loaded on session start; `/memory` appends bullet points
+- Memory file **AGENT.md** auto-loaded on session start
 - Model Context Protocol (MCP) client with static configuration (e.g., Playwright MCP over TCP)
 - Structured JSONL logs per session; terminal logs with levels
-- Linux-only, Python 3.13; run in a Docker container (no sandboxing inside the app)
+- Linux-only, Python; run in a Docker container (no sandboxing inside the app)
 
 This project is built for personal use by a senior engineer; it is open-sourced but not distributed as a package.
 
@@ -17,24 +17,21 @@ This project is built for personal use by a senior engineer; it is open-sourced 
 # Quickstart
 
 ## Requirements
-- Python **3.13** (Linux)
+- Python 3 (Linux)
 - `ANTHROPIC_API_KEY` environment variable set
 - (Optional) A running MCP server (e.g., Playwright MCP) reachable via TCP
 
 ## Install (dev)
 ```bash
 # clone repo
-cd aiagent
-python3.13 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .  # local dev install via pyproject.toml
+docker build -t ai-agent .
+docker run -it --rm ai-agent
 ```
 
-## Configure (v0.1 hard-coded)
+## Configure
 No config file is required for v0.1. Anthropic model defaults to `claude-3.5-sonnet` (exact name may be adjusted in code). MCP servers are statically listed in code (e.g., Playwright at `127.0.0.1:8710`).
 
-## Run
+## Run (inside container)
 ```bash
 # Start interactive chat (REPL)
 aiagent
@@ -43,8 +40,6 @@ aiagent
 aiagent --exec "Generate a README skeleton for my project"
 
 # Slash commands (type these inside REPL or pass via --exec)
-/memory Remember to refactor fs.write to be atomic
-/commit "checkpoint before adding MCP"
 /clear   # starts a new conversation & rotates log file
 /quit
 ```
@@ -55,8 +50,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## Logging
-- Terminal: human logs at INFO (use `--debug` to increase verbosity)
-- Files: JSONL in `./.aiagent/logs/session-YYYYmmdd-HHMMSS.jsonl`
+- Terminal: human logs at INFO (patch source to change)
+- Files: JSONL in `./.aiagent/logs/session-YYYYmmdd-HHMMSS/convo_0001.jsonl`
 
 Each turn prints **usage** after the model reply, e.g.:
 ```
@@ -66,15 +61,14 @@ usage: input=1234, output=987, thinking=256, total=2477
 
 ---
 
-# What it can do (v0.1)
+# What it can do
 - Chat with the LLM (Anthropic)
 - Call tools when prompted by the user or as part of the model plan
-- Append memory items to `AGENT.md` via `/memory <text>` (exact bullet point at file end)
-- Execute bash commands via the Shell tool (120s timeout, 200KB stdout/stderr truncation)
+- Execute bash commands via the Shell tool
 - List/read/write text files via Filesystem tool (writes are atomic)
 - Use MCP tools exposed by configured MCP servers (namespaced as `mcp.<server>.<tool>`)
 
-# What it will not do (v0.1)
+# What it will not do
 - Streaming tokens
 - Multi-provider routing (Anthropic only)
 - History management or persistence beyond logs
@@ -85,11 +79,12 @@ usage: input=1234, output=987, thinking=256, total=2477
 
 # Repository Layout
 ```
-aiagent/
+ai-agent/
   aiagent/             # Python package
     __init__.py
     agent/
-      loop.py          # core agent loop
+      agent.py         # core agent loop
+      conversatoin.py  # single conversation
       message.py       # message / turn models
       prompts/
         system.md      # default system prompt
@@ -98,7 +93,7 @@ aiagent/
         shell.py       # bash exec with timeout and truncation
         mcp_client.py  # MCP adapter and tool registry bridge
       providers/
-        anthropic_client.py  # Anthropic API wrapper
+        anthropic.py  # Anthropic API wrapper
       logging/
         jsonl.py       # structured JSONL logging
   cli/
@@ -111,32 +106,24 @@ aiagent/
   README.md
   ARCHITECTURE.md
   ROADMAP.md
-  pyproject.toml
-  ruff.toml
-  mypy.ini
 ```
 
 ---
 
 # CLI
 ```
-aiagent [--debug] [--temp FLOAT] [--model NAME] [--exec STRING]
+aiagent [--exec STRING]
 
 Options:
   --exec STRING   Run a single prompt or slash command non-interactively.
-  --debug         Increase terminal verbosity to DEBUG.
-  --model NAME    Override model name (default configured in code).
-  --temp FLOAT    Set temperature; if omitted, no temperature is sent to the provider.
   -h, --help      Show help.
 ```
 
 **REPL**: multiline input is supported; submit on blank line. **--exec**: single line only.
 
 **Slash commands** (enter inside REPL or via `--exec`):
-- `/memory <text>` → append `* <text>` to end of `AGENT.md`.
-- `/commit <msg>` → `git add -A && git commit -m "<msg>"` via Shell tool.
-- `/clear` → start a new conversation and rotate JSONL file.
-- `/quit` → exit.
+- `/clear` -> start a new conversation and rotate JSONL file.
+- `/quit` -> exit.
 
 ---
 
@@ -154,6 +141,3 @@ aiagent --exec "login to https://abcd.com then download latest invoice to ./down
 ```
 
 ---
-
-# License
-No explicit license intended (personal educational project).
